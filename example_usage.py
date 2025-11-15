@@ -31,7 +31,7 @@ def check_ollama_models_example():
         print("\n" + "-" * 60)
         
         # Check for required models
-        required = ["llama3.1", "mxbai-embed-large"]
+        required = ["llama3.1", "mistral"]
         print(f"\nChecking required models: {required}")
         status = GraphRAGPipeline.ensure_ollama_models(
             required_models=required,

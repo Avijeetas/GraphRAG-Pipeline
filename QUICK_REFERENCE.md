@@ -139,7 +139,7 @@ pipeline = GraphRAGPipeline(
     neo4j_username="neo4j",
     neo4j_password="password",
     llm_model="llama3.1",
-    embedding_model="mxbai-embed-large",
+    embedding_model="mistral",
     check_models=True,      # Check Ollama models
     auto_pull_models=True   # Auto-pull missing models
 )
@@ -159,7 +159,7 @@ for model in models:
 
 # Check for specific models
 status = GraphRAGPipeline.ensure_ollama_models(
-    required_models=["llama3.1", "mxbai-embed-large"],
+    required_models=["llama3.1", "mistral"],
     auto_pull=True,   # Auto-pull missing
     check_only=False  # Actually pull if missing
 )

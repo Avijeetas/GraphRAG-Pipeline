@@ -45,7 +45,7 @@ def main():
     print("3. Required models for GraphRAG Pipeline:")
     print("-" * 70)
     
-    required_models = ["llama3.1", "mxbai-embed-large"]
+    required_models = ["llama3.1", "mistral"]
     
     for model in required_models:
         status = GraphRAGPipeline.ensure_ollama_models(

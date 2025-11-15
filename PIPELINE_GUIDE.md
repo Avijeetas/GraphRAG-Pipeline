@@ -224,7 +224,7 @@ from langchain_community.vectorstores import Neo4jVector
 
 # Initialize embeddings
 embeddings = OllamaEmbeddings(
-    model="mxbai-embed-large"  # Embedding model
+    model="mistral"  # Embedding model
 )
 
 # Create vector index from existing graph

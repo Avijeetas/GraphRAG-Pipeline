@@ -191,7 +191,7 @@ class GraphRAGPipeline:
         neo4j_username: Optional[str] = None,
         neo4j_password: Optional[str] = None,
         llm_model: str = "llama3.1",
-        embedding_model: str = "mxbai-embed-large",
+        embedding_model: str = "mistral",
         check_models: bool = True,
         auto_pull_models: bool = True,
     ):
