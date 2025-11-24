@@ -1,8 +1,7 @@
 """
-GraphRAG Pipeline - Reusable Module
 A complete pipeline for building knowledge graphs from documents and performing hybrid RAG.
 """
-
+import argparse
 import os
 import subprocess
 import sys
@@ -10,7 +9,8 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
-import argparse
+# Load environment variables
+load_dotenv()
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -27,10 +27,6 @@ from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_community.vectorstores import Neo4jVector
-
-# Load environment variables
-load_dotenv()
-
 
 class GraphRAGPipeline:
     """
@@ -529,7 +525,7 @@ class GraphRAGPipeline:
         if self.entity_chain is None:
             self.setup_entity_extraction()
         
-        result = ""
+        result = []
         entities = self.entity_chain.invoke(question)
         
         for entity in entities.names:
@@ -540,17 +536,17 @@ class GraphRAGPipeline:
                 CALL {
                   WITH node
                   MATCH (node)-[r:!MENTIONS]->(neighbor)
-                  RETURN node.id + ' - ' + type(r) + ' -> ' + neighbor.id AS output
+                  RETURN node.id + ' -> ' + type(r) + ' -> ' + neighbor.id AS output
                   UNION ALL
                   WITH node
                   MATCH (node)<-[r:!MENTIONS]-(neighbor)
-                  RETURN neighbor.id + ' - ' + type(r) + ' -> ' + node.id AS output
+                  RETURN neighbor.id + ' -> ' + type(r) + ' -> ' + node.id AS output
                 }
                 RETURN output LIMIT $limit
                 """,
                 {"query": entity, "limit": limit},
             )
-            result += "\n".join([el['output'] for el in response])
+            result.extend([el["output"] for el in response])
         
         return result
 
@@ -571,7 +567,7 @@ class GraphRAGPipeline:
         if self.vector_retriever:
             try:
                 vector_docs = self.vector_retriever.invoke(question)
-                vector_data = [doc.page_content.replace("text:","") for doc in vector_docs] if vector_docs else ["⚠ No vector data found."]
+                vector_data = [doc.page_content.lstrip().removeprefix("text: ").removeprefix("text:\n") for doc in vector_docs] if vector_docs else ["⚠ No vector data found."]
             except Exception as e:
                 vector_data = [f"⚠ Error retrieving vector data: {e}"]
         else:
@@ -581,15 +577,15 @@ class GraphRAGPipeline:
             print("no document is found")
         return {
             "Relationship": graph_data,
-            "Document": "\n".join(vector_data)
+            "Documents": (vector_data)
         }
 
     
-    def process_document(
+    def processDocument (
         self,
         file_path: Optional[str] = None,
         directory: Optional[str] = None,
-        chunk_size: int = 150,
+        chunk_size: int = 100,
         chunk_overlap: int = 24,
         create_vector_index: bool = True,
         create_fulltext_index: bool = True
@@ -651,3 +647,53 @@ class GraphRAGPipeline:
             "vector_retriever": self.vector_retriever
         }
 
+
+def run_graphrag_pipeline(file_path: str, question: str):
+    """
+    Runs the GraphRAG pipeline on a document and queries it.
+
+    Args:
+        file_path (str): Path to the document file
+        question (str): Query to ask the pipeline
+
+    Returns:
+        dict: Retrieved context including relationship and documents
+    """
+    if not file_path or not question:
+        raise ValueError("file_path and question must be provided")
+
+    # Initialize pipeline
+    pipeline = GraphRAGPipeline()
+
+    # Process documents
+    result = pipeline.processDocument(file_path=file_path)
+
+    # Get vector retriever
+    vector_retriever = result["vector_retriever"]
+
+    # Use the pipeline for question
+    context = pipeline.full_retriever(question)
+
+    print("\n===== Retrieved Context =====")
+    print(context['Relationship'])
+    print(context['Documents'])
+
+    return context
+
+if __name__ == "__main__":
+    # Setup argument parser
+    parser = argparse.ArgumentParser(description="GraphRAG Pipeline: document processing and retrieval")
+    parser.add_argument(
+        "-f", "--file_path", type=str, required=True,
+        help="Path to the document file (e.g., sample_doc.txt)"
+    )
+    parser.add_argument(
+        "-q", "--question", type=str, required=True,
+        help="Question to query the pipeline"
+    )
+
+    args = parser.parse_args()
+    file_path = args.file_path
+    question = args.question
+
+    run_graphrag_pipeline(file_path, question)
