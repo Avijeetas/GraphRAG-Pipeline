@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
-
+import argparse
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -386,7 +386,7 @@ class GraphRAGPipeline:
         node_label: str = "Document",
         text_properties: List[str] = None,
         embedding_property: str = "embedding",
-        retrieval_kwargs: Dict = None
+        retrieval_kwargs: Dict = {"k": 3}
     ) -> Any:
         """
         Create vector embeddings and retriever for hybrid search.
@@ -553,7 +553,7 @@ class GraphRAGPipeline:
             result += "\n".join([el['output'] for el in response])
         
         return result
-    
+
     def full_retriever(self, question: str) -> str:
         """
         Combine graph and vector retrieval for comprehensive context.
@@ -562,31 +562,34 @@ class GraphRAGPipeline:
             question: User question
         
         Returns:
-            Combined context from graph and vector retrieval
+            Combined context from graph and vector retrieval, with safety checks
         """
-        if self.vector_retriever is None:
-            raise ValueError("Vector retriever not initialized. Call create_vector_index() first.")
+        # Graph context
+        graph_data = self.graph_retriever(question) if self.graph else "⚠ Graph not initialized."
+        vector_data = []
+        # Vector context
+        if self.vector_retriever:
+            try:
+                vector_docs = self.vector_retriever.invoke(question)
+                vector_data = [doc.page_content for doc in vector_docs] if vector_docs else ["⚠ No vector data found."]
+            except Exception as e:
+                vector_data = [f"⚠ Error retrieving vector data: {e}"]
+        else:
+            vector_data = ["⚠ Vector retriever not initialized."]
         
-        # Get graph-based context
-        graph_data = self.graph_retriever(question)
-        
-        # Get vector-based context
-        vector_docs = self.vector_retriever.invoke(question)
-        vector_data = [doc.page_content for doc in vector_docs]
-        
-        # Combine both
-        final_data = f"""Graph data:
-{graph_data}
-vector data:
-{"#Document ".join(vector_data)}
-    """
-        return final_data
+        if len(vector_data) == 0:
+            print("no document is found")
+        return {
+            "Relationship": graph_data,
+            "context": "\n".join(vector_data)
+        }
+
     
     def process_documents(
         self,
         file_path: Optional[str] = None,
         directory: Optional[str] = None,
-        chunk_size: int = 250,
+        chunk_size: int = 100,
         chunk_overlap: int = 24,
         create_vector_index: bool = True,
         create_fulltext_index: bool = True
@@ -616,7 +619,7 @@ vector data:
         # Step 2: Split documents
         print("Splitting documents...")
         documents = self.split_documents(docs, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        print(f"Split into {len(documents)} chunks")
+        print(f"Splitted into {len(documents)} chunks")
         
         # Step 3: Extract graph structure
         print("Extracting entities and relationships...")
@@ -649,18 +652,35 @@ vector data:
         }
 
 
-# Example usage
+
+
 if __name__ == "__main__":
+    # Setup argument parser
+    parser = argparse.ArgumentParser(description="GraphRAG Pipeline: document processing and retrieval")
+    parser.add_argument(
+        "-f", "--file_path", type=str, required=True,
+        help="Path to the document file (e.g., sample_doc.txt)"
+    )
+    parser.add_argument(
+        "-q", "--question", type=str, required=True,
+        help="Question to query the pipeline"
+    )
+
+    args = parser.parse_args()
+    file_path = args.file_path
+    question = args.question
+
     # Initialize pipeline
     pipeline = GraphRAGPipeline()
     
     # Process documents
-    result = pipeline.process_documents(file_path="dummytext.txt")
+    result = pipeline.process_documents(file_path=file_path)
     
-    # Get retrievers
+    # Get vector retriever
     vector_retriever = result["vector_retriever"]
-    
-    # Use the pipeline
-    context = pipeline.full_retriever("Who is Nonna Lucia?")
-    print(context)
+    print("Vector retriever initialized:", vector_retriever)
 
+    # Use the pipeline for question
+    context = pipeline.full_retriever(question)
+    print("\n===== Retrieved Context =====")
+    print(context)
