@@ -571,7 +571,7 @@ class GraphRAGPipeline:
         if self.vector_retriever:
             try:
                 vector_docs = self.vector_retriever.invoke(question)
-                vector_data = [doc.page_content for doc in vector_docs] if vector_docs else ["⚠ No vector data found."]
+                vector_data = [doc.page_content.replace("text:","") for doc in vector_docs] if vector_docs else ["⚠ No vector data found."]
             except Exception as e:
                 vector_data = [f"⚠ Error retrieving vector data: {e}"]
         else:
@@ -581,15 +581,15 @@ class GraphRAGPipeline:
             print("no document is found")
         return {
             "Relationship": graph_data,
-            "context": "\n".join(vector_data)
+            "Document": "\n".join(vector_data)
         }
 
     
-    def process_documents(
+    def process_document(
         self,
         file_path: Optional[str] = None,
         directory: Optional[str] = None,
-        chunk_size: int = 100,
+        chunk_size: int = 150,
         chunk_overlap: int = 24,
         create_vector_index: bool = True,
         create_fulltext_index: bool = True
@@ -651,36 +651,3 @@ class GraphRAGPipeline:
             "vector_retriever": self.vector_retriever
         }
 
-
-
-
-if __name__ == "__main__":
-    # Setup argument parser
-    parser = argparse.ArgumentParser(description="GraphRAG Pipeline: document processing and retrieval")
-    parser.add_argument(
-        "-f", "--file_path", type=str, required=True,
-        help="Path to the document file (e.g., sample_doc.txt)"
-    )
-    parser.add_argument(
-        "-q", "--question", type=str, required=True,
-        help="Question to query the pipeline"
-    )
-
-    args = parser.parse_args()
-    file_path = args.file_path
-    question = args.question
-
-    # Initialize pipeline
-    pipeline = GraphRAGPipeline()
-    
-    # Process documents
-    result = pipeline.process_documents(file_path=file_path)
-    
-    # Get vector retriever
-    vector_retriever = result["vector_retriever"]
-    print("Vector retriever initialized:", vector_retriever)
-
-    # Use the pipeline for question
-    context = pipeline.full_retriever(question)
-    print("\n===== Retrieved Context =====")
-    print(context)
